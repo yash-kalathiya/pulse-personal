@@ -1792,6 +1792,8 @@ Info sheet "How Sleep works": "Sleep Performance compares the sleep you got with
 
 Info sheet "Tonight's sleep": "Bedtimes are worked back from your typical wake time and how efficiently you sleep. Peak gets you 100% of tonight's need, Perform 85%, Get by 70%."
 
+Local fork addition (2026-10-11): Home and Sleep detail planners have a labelled Wake-up time input and Use typical wake reset. A custom target shifts each goal's recommended bedtime while retaining its existing time-in-bed allowance and sleep need. The target is a temporary, per-view preview in the profile time zone, not an alarm, recorded sleep edit, or Google write. Invalid/nonexistent DST times retain the automatic plan with an explanation. No preview is offered without an available calibrated plan.
+
 Phone, 390:
 
 ```

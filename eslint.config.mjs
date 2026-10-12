@@ -11,6 +11,9 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
+    "build-scripts/**",
+    ".local-private/**",
+    ".lwc/**",
     "next-env.d.ts",
     // Agent worktrees are full checkouts of other branches.
     ".claude/**",

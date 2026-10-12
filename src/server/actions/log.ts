@@ -27,6 +27,7 @@ export async function deleteLogEntry(input: z.input<typeof Delete>): Promise<Act
   const user = await currentUser();
   if (!user) return SIGNED_OUT;
   const { userId } = user;
+  if (getConfig().googleReadOnly) return { ok: false, error: "Google Health logging is disabled on this read-only instance." };
   const r = Delete.safeParse(input);
   if (!r.success) return { ok: false, error: r.error.issues[0].message };
   const { dataSource } = getConfig();

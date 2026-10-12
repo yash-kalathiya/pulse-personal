@@ -1,5 +1,4 @@
 import { cn } from "@/lib/utils"
-import { clock, hmm } from "@/lib/format"
 import { FEATURES } from "@/lib/features"
 import { trendHref } from "@/lib/url"
 import { InsightCard } from "@/components/metrics/InsightCard"
@@ -17,8 +16,9 @@ import type { SleepVM } from "@/server/queries/types"
 import { pageDay, type SearchParams } from "../_lib/day"
 import { HashScroll } from "../_lib/HashScroll"
 import { SLEEP_INFO, TONIGHT_INFO } from "../_lib/info"
-import { CAPTION, LABEL, LEGEND, statProps } from "../_lib/view"
+import { LEGEND, statProps } from "../_lib/view"
 import { HoursVsNeed, SleepConsistency, SleepEfficiency, SleepStress } from "./SleepCards"
+import { SleepPlanner } from "./SleepPlanner"
 
 export const metadata = { title: "Sleep", description: "Sleep performance, stages, need and debt, plus tonight’s bedtime plan." }
 
@@ -113,25 +113,5 @@ function Planner({ vm, timeZone }: { vm: SleepVM; timeZone: string }) {
         copy={m.reason === "calibrating" ? "Sleep Planner needs 7 nights to learn your wake time." : undefined}
       />
     )
-  const plan = m.value
-  const row = (label: string, caption: string, time: string) => (
-    <div key={label} className="flex min-h-13 items-center gap-3 py-2">
-      <span className="min-w-0 flex-1">
-        <span className={cn(LABEL, "block truncate")}>{label}</span>
-        <span className={cn(CAPTION, "mt-0.5 block truncate")}>{caption}</span>
-      </span>
-      <span className="font-numeric text-xl leading-6 font-bold tabular-nums">{time}</span>
-    </div>
-  )
-  return (
-    <div className="space-y-2">
-      <div className="divide-y divide-border">
-        {plan.plans.map((p) => row(p.label, `${Math.round(p.share * 100)}% of need`, clock(p.bedtimeAt, timeZone)))}
-        {row("Typical wake", plan.weekdayWake ? "Weekday wake time" : "Weekend wake time", clock(plan.wakeAt, timeZone))}
-      </div>
-      <p className={CAPTION}>
-        Need tonight: <span className="font-numeric tabular-nums">{hmm(plan.needMin)}</span>
-      </p>
-    </div>
-  )
+  return <SleepPlanner plan={m.value} timeZone={timeZone} />
 }

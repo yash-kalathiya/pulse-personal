@@ -1,5 +1,15 @@
 # Pulse
 
+This is a personal, noncommercial fork of **[adityaongit/pulse](https://github.com/adityaongit/pulse)**,
+originally created by Aditya Jindal. The original license, copyright notices and
+dependency credits are retained; this fork is not the upstream project.
+
+Local additions include read-only Google access, Fitbit-source/date filtering,
+certificate-backed Wi-Fi access and an interactive wake-time bedtime preview.
+See [the local-fork guide](docs/local-fork.md). Credentials, personal health
+records, database backups, certificates and machine-specific notes are excluded
+from this repository. Scores are wellness estimates, not clinical assessments.
+
 A personal recovery, strain and sleep app for the Fitbit Air: one Next.js app (frontend, sync worker and scoring) on Postgres. The server's admins invite people (or open sign-up); each person connects their own Google account and sees only their own data.
 See `docs/plans/` for the plan.
 

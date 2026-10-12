@@ -62,6 +62,7 @@ export function logWriter(userId: number, timeZone: string): LogWriter | null {
 
 /** Logs water, food, weight (and body fat), mood, symptoms, or (female profiles) a period or ovulation test for `userId`. */
 export async function logFor(userId: number, input: LogInput): Promise<ActionResult<{ demo: boolean }>> {
+  if (getConfig().googleReadOnly) return { ok: false, error: "Google Health logging is disabled on this read-only instance." };
   const r = Input.safeParse(input);
   if (!r.success) return { ok: false, error: r.error.issues[0].message };
   const v = r.data;

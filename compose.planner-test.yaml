@@ -1,0 +1,31 @@
+# Disposable generated-data-only browser tests. No personal env files or DB mounts.
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: pulse
+      POSTGRES_PASSWORD: planner-test-only
+    tmpfs: [/var/lib/postgresql]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pulse -d postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  browser:
+    image: pulse-fitbit-review
+    environment:
+      E2E_PG_ADMIN_URL: postgres://pulse:planner-test-only@db:5432/postgres
+      NEXT_TELEMETRY_DISABLED: "1"
+      BETTER_AUTH_TELEMETRY: "0"
+      DO_NOT_TRACK: "1"
+    volumes:
+      - ./e2e:/app/e2e:ro,Z
+      - ./playwright.config.ts:/app/playwright.config.ts:ro,Z
+      - ./.local-private/planner-test-results:/app/test-results:Z
+      - ./.local-private/browser-cache:/root/.cache/ms-playwright:Z
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 4g
+    entrypoint: ["sh", "-c"]
+    command: ["pnpm exec playwright install --with-deps chromium && pnpm e2e e2e/journeys.spec.ts --grep '4. bedtime plan' --project=390 --project=1440 --workers=1"]

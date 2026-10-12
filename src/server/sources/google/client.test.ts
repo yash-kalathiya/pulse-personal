@@ -6,7 +6,8 @@ import { freshDb, USER } from "../../testing";
 import { oauthTokens, rawPayloads } from "../../db/schema";
 import { DATA_TYPE_IDS, DATA_TYPES } from "./catalogue";
 import { localDay, localMidnight } from "../../time";
-import { archivePage, buildFilter, createGoogleClient, localWindows, parsePairedDevices, pruneRawPayloads, RAW_RETENTION_DAYS } from "./client";
+import { archivePage, buildFilter, createGoogleClient, localWindows, parsePairedDevices, pruneRawPayloads, RAW_RETENTION_DAYS, type ClientDeps } from "./client";
+import { FITBIT_DEVICE_FAMILY } from "./sourcePolicy";
 import { GoogleError } from "./oauth";
 
 const TZ = "Asia/Kolkata"; // UTC+5:30, so a UTC date and the local date differ before 05:30
@@ -29,7 +30,7 @@ const token = async () => (await db.select().from(oauthTokens))[0];
 type Handler = (url: URL, init: RequestInit) => Response | Promise<Response>;
 
 /** A client over a stubbed fetch, a fake clock that only sleep advances, and recorded calls. */
-function setup(api: Handler, token: Handler = () => json({ access_token: "at-2", expires_in: 3600 })) {
+function setup(api: Handler, token: Handler = () => json({ access_token: "at-2", expires_in: 3600 }), options: Partial<ClientDeps> = {}) {
   let clock = NOW;
   const sleeps: number[] = [];
   const calls: { url: URL; init: RequestInit }[] = [];
@@ -49,6 +50,7 @@ function setup(api: Handler, token: Handler = () => json({ access_token: "at-2",
       sleeps.push(ms);
       clock += ms;
     },
+    ...options,
   });
   const apiCalls = () => calls.filter((c) => c.url.host === "health.googleapis.com");
   const tokenCalls = () => calls.filter((c) => c.url.host === "oauth2.googleapis.com");
@@ -64,6 +66,77 @@ const caught = (p: Promise<unknown>) =>
     },
     (e: unknown) => e as GoogleError,
   );
+
+describe("Fitbit-only reads", () => {
+  const fitbit = { dataSource: { platform: "FITBIT", device: { displayName: "Google Fitbit Air" } } };
+  const other = { dataSource: { platform: "HEALTH_KIT" } };
+  const from = lm("2026-10-01"), to = lm("2026-10-02");
+
+  it("filters sleep before mapping and archiving, while preserving pagination", async () => {
+    const { client, apiCalls } = setup((url) => json({ dataPoints: [other, fitbit, {}],
+      ...(url.searchParams.has("pageToken") ? {} : { nextPageToken: "next" }) }), undefined, { fitbitOnly: true });
+    expect(await client.list("sleep", from, to)).toEqual([fitbit, fitbit]);
+    expect(apiCalls()).toHaveLength(2);
+    expect(apiCalls().every((c) => !c.url.searchParams.has("dataSourceFamily"))).toBe(true);
+    for (const r of await raws()) expect(JSON.parse(gunzipSync(r.gzBody).toString()).dataPoints).toEqual([fitbit]);
+  });
+
+  it("restricts list queries to Google wearables and rejects third-party/unknown points", async () => {
+    const { client, apiCalls } = setup(() => json({ dataPoints: [other, fitbit, {}] }), undefined, { fitbitOnly: true });
+    expect(await client.list("heart-rate", from, to)).toEqual([fitbit]);
+    expect(apiCalls()[0].url.searchParams.get("dataSourceFamily")).toBe(FITBIT_DEVICE_FAMILY);
+  });
+
+  it("never requests a date before the configured boundary", async () => {
+    const { client, apiCalls } = setup(() => json({}), undefined, { fitbitOnly: true, syncFromDay: "2026-10-01" });
+    await client.list("daily-resting-heart-rate", lm("2026-04-01"), to);
+    expect(filters(apiCalls())).toEqual(['daily_resting_heart_rate.date >= "2026-10-01" AND daily_resting_heart_rate.date < "2026-10-02"']);
+    await client.list("sleep", lm("2026-04-01"), from);
+    expect(apiCalls()).toHaveLength(1);
+  });
+
+  it("checks every aggregate source page and sends the family in the POST body", async () => {
+    const { client, apiCalls } = setup((url, init) => {
+      if (init.method === "POST") {
+        expect(JSON.parse(String(init.body)).dataSourceFamily).toBe(FITBIT_DEVICE_FAMILY);
+        return json({ rollupDataPoints: [{ civilStartTime: { date: { year: 2026, month: 10, day: 1 } }, steps: { countSum: "1000" } }] });
+      }
+      expect(url.searchParams.get("fields")).toBe("dataPoints(dataSource),nextPageToken");
+      expect(url.searchParams.get("dataSourceFamily")).toBe(FITBIT_DEVICE_FAMILY);
+      return json({ dataPoints: [fitbit], ...(url.searchParams.has("pageToken") ? {} : { nextPageToken: "next" }) });
+    }, undefined, { fitbitOnly: true, syncFromDay: "2026-10-01" });
+    expect(await client.dailyRollUp("steps", "2026-04-01", "2026-10-02")).toHaveLength(1);
+    expect(apiCalls()).toHaveLength(3);
+  });
+
+  it("fails closed for unknown or Pixel sources in an aggregate, without a POST or archive", async () => {
+    for (const point of [{}, { dataSource: { platform: "FITBIT", device: { displayName: "Pixel Watch" } } }]) {
+      const { client, apiCalls } = setup(() => json({ dataPoints: [point] }), undefined, { fitbitOnly: true });
+      expect((await caught(client.dailyRollUp("steps", "2026-10-01", "2026-10-02"))).code).toBe("non_fitbit_rollup_source");
+      expect(apiCalls()).toHaveLength(1);
+    }
+    expect(await raws()).toHaveLength(0);
+  });
+
+  it("only an explicitly authorized unsupported source check falls back to the same family/date", async () => {
+    const { client, apiCalls } = setup((_url, init) => init.method === "POST"
+      ? json({ rollupDataPoints: [] })
+      : json({ error: { code: 400, details: [{ reason: "UNSUPPORTED_DATA_TYPE_ACTION" }] } }, 400), undefined,
+    { fitbitOnly: true, syncFromDay: "2026-10-01", allowRestrictedRollupFallback: true });
+    await client.dailyRollUp("total-calories", "2026-04-01", "2026-10-02");
+    expect(apiCalls()).toHaveLength(2);
+    const request = JSON.parse(String(apiCalls()[1].init.body));
+    expect(request.dataSourceFamily).toBe(FITBIT_DEVICE_FAMILY);
+    expect(request.range.start.date).toEqual({ year: 2026, month: 10, day: 1 });
+  });
+
+  it("fallback consent never bypasses an explicit non-Fitbit source", async () => {
+    const { client, apiCalls } = setup(() => json({ dataPoints: [other] }), undefined,
+      { fitbitOnly: true, syncFromDay: "2026-10-01", allowRestrictedRollupFallback: true });
+    expect((await caught(client.dailyRollUp("steps", "2026-10-01", "2026-10-02"))).code).toBe("non_fitbit_rollup_source");
+    expect(apiCalls()).toHaveLength(1);
+  });
+});
 
 describe("catalogue", () => {
   it("every listable type has a filter member, and only rollup types lack one", () => {

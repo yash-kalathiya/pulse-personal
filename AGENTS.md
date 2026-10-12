@@ -54,7 +54,7 @@ Run `pnpm typecheck && pnpm lint && pnpm test` before every commit. Run `pnpm e2
 - **Design references.** `docs/design/reference/` is gitignored and holds third-party screenshots. Never commit or publish it.
 - **Git.**
   - Use the `git` CLI only, never `gh`.
-  - Commit as the `adityaongit` identity.
+  - For this personal fork, use the contributor's configured Git identity; do not impersonate the upstream author. Retain upstream attribution in README, LICENSE and NOTICE.
   - Use conventional commit messages, signed off (`git commit -s`).
   - `main` is protected (`.github/rulesets/main.json`): work on a branch and land it through a pull request with green CI. See CONTRIBUTING.md and docs/maintainers.md.
 - **Secrets.** Never log tokens or API response bodies. `.env` and `backups/` are gitignored.

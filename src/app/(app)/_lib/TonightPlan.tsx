@@ -9,6 +9,7 @@ import { openSheet } from "@/components/shells/SheetTrigger"
 import { clock, hmm } from "@/lib/format"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import type { SleepPlanVM } from "@/server/queries/types"
+import { useWakeTimePreview, WakeTimeControl } from "./WakeTimePreview"
 
 // 32 px once the card is 288 px wide; narrower cards (the laptop half-column) step down to 26 and then 22 px so the
 // two times never overflow (U18 H-01: at 1280 px the 26 px times ran into the card edge).
@@ -22,7 +23,8 @@ export type SleepAlarmVM = { at: number; mode: "exact" | "window" }
  * Home's "Tonight's sleep" body: bedtime for the chosen goal, typical wake, goal toggle (spec §7.1, journey 4). With an
  * alarm (the reference app, home-09) the right block is the alarm and an "Edit alarm" button closes the card.
  */
-export function TonightPlan({ plan, timeZone, alarm }: { plan: SleepPlanVM; timeZone: string; alarm?: SleepAlarmVM | null }) {
+export function TonightPlan({ plan: original, timeZone, alarm }: { plan: SleepPlanVM; timeZone: string; alarm?: SleepAlarmVM | null }) {
+  const { plan, custom, control } = useWakeTimePreview(original, timeZone)
   const wake = FEATURES.sleepAlarm && alarm ? alarm : null
   const [key, setKey] = React.useState<SleepPlanVM["plans"][number]["key"]>("peak")
   const chosen = plan.plans.find((p) => p.key === key) ?? plan.plans[0]
@@ -54,7 +56,7 @@ export function TonightPlan({ plan, timeZone, alarm }: { plan: SleepPlanVM; time
             <span className="block">{wake.mode === "exact" ? "Exact time" : "Wake window"}</span>
           </span>
         ) : (
-          <span className={cn(LABEL, "text-right")}>Typical wake</span>
+          <span className={cn(LABEL, "text-right")}>{custom ? "Planned wake" : "Typical wake"}</span>
         )}
       </div>
       <ToggleGroup
@@ -80,6 +82,7 @@ export function TonightPlan({ plan, timeZone, alarm }: { plan: SleepPlanVM; time
       <p className="text-xs leading-4 font-medium text-muted-foreground">
         Need tonight: <span className="font-numeric tabular-nums">{hmm(plan.needMin)}</span>
       </p>
+      {!wake && <WakeTimeControl {...control} />}
       {wake && (
         <button type="button" aria-haspopup="dialog" onClick={() => openSheet("alarm")} className={CARD_BUTTON}>
           <Pencil aria-hidden className="size-4" strokeWidth={2} />

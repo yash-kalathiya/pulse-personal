@@ -73,6 +73,21 @@ test("3. workout review: Strain → activity → HR and zones", async ({ page })
 test("4. bedtime plan: Home's Tonight's sleep → the Sleep planner", async ({ page }) => {
   await page.goto("/");
   const card = page.getByRole("region", { name: "Tonight’s sleep" });
+  // Confirm a client handler is hydrated before editing the native time input.
+  await expect.poll(async () => {
+    await card.getByRole("radio", { name: /^Perform/ }).click();
+    return card.getByRole("radio", { name: /^Perform/ }).isChecked();
+  }).toBe(true);
+  await card.getByRole("radio", { name: /^Peak/ }).click();
+  await expect(card.getByRole("radio", { name: /^Peak/ })).toBeChecked();
+  const typical = await card.getByLabel("Wake-up time").inputValue();
+  const target = typical === "09:00" ? "08:00" : "09:00";
+  const before = await card.getByRole("group", { name: /for peak$/ }).getAttribute("aria-label");
+  await card.getByLabel("Wake-up time").fill(target);
+  await expect(card.getByText("Planned wake", { exact: true })).toBeVisible();
+  await expect(card.getByRole("group", { name: /for peak$/ })).not.toHaveAttribute("aria-label", before!);
+  await card.getByRole("button", { name: "Use typical wake" }).click();
+  await expect(card.getByLabel("Wake-up time")).toHaveValue(typical);
   await card.getByRole("radio", { name: /^Perform/ }).click();
   await expect(card.getByRole("radio", { name: /^Perform/ })).toBeChecked();
   await expect(card.getByRole("group", { name: /for perform$/ })).toBeVisible();
@@ -81,6 +96,12 @@ test("4. bedtime plan: Home's Tonight's sleep → the Sleep planner", async ({ p
   const planner = page.getByRole("region", { name: "Tonight’s sleep" });
   await expect(planner).toBeInViewport();
   for (const goal of ["Peak", "Perform", "Get by"]) await expect(planner.getByText(goal, { exact: true })).toBeVisible();
+  await expect(async () => {
+    await planner.getByLabel("Wake-up time").fill(target);
+    await expect(planner.getByText("Planned wake", { exact: true })).toBeVisible();
+  }).toPass();
+  await expect(planner.getByText(/Preview only/)).toBeVisible();
+  await planner.screenshot({ path: `test-results/wake-preview-${test.info().project.name}.png` });
 });
 
 test("5. healthspan: Health → Healthspan → header collapses → a factor opens in place → its Trend View", async ({ page }) => {

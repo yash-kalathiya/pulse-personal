@@ -1,0 +1,40 @@
+# Real data, read-only Google access, private database, local browser access.
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: pulse
+      POSTGRES_DB: pulse
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?use --env-file .local-private/pulse.env}
+    volumes:
+      - pulse-personal-pg:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pulse -d pulse"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  pulse:
+    build: .
+    env_file: .local-private/pulse.env
+    environment:
+      GOOGLE_FITBIT_ONLY: "true"
+      GOOGLE_SYNC_FROM: ${GOOGLE_SYNC_FROM:?set GOOGLE_SYNC_FROM in the private env file}
+      GOOGLE_FITBIT_ROLLUP_FALLBACK: "true"
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 768m
+  import:
+    profiles: ["import"]
+    image: pulse-local-review
+    env_file: .local-private/pulse.env
+    volumes:
+      - ${FITBIT_CREDENTIAL_DIR:-./.local-private/fitbit-source}:/input:ro
+      - ./.local-private:/private:ro
+      - ./scripts/import-fitbit-grant.mjs:/app/scripts/import-fitbit-grant.mjs:ro
+      - ./scripts/initialize-local-account.mts:/app/scripts/initialize-local-account.mts:ro
+    command: ["node", "scripts/import-fitbit-grant.mjs", "import"]
+volumes:
+  pulse-personal-pg:

@@ -1,0 +1,28 @@
+# Current-Wi-Fi overlay on compose.personal.yaml. No IPv6, wildcard bind or DB port.
+services:
+  pulse:
+    environment:
+      APP_URL: https://pulse.local:8443
+  wifi-https:
+    image: caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+    network_mode: host
+    user: "1000:1000"
+    read_only: true
+    cap_drop: [ALL]
+    # Official Caddy binary carries this file capability, even on port 8443.
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: [no-new-privileges:true]
+    environment:
+      PULSE_LAN_IP: ${PULSE_LAN_IP:?set PULSE_LAN_IP}
+      PULSE_LAN_CIDR: ${PULSE_LAN_CIDR:?set PULSE_LAN_CIDR}
+    volumes:
+      - ./deploy/home-wifi.Caddyfile:/etc/caddy/Caddyfile:ro,Z
+      - ./.local-private/caddy-wifi-data:/data:Z
+    tmpfs:
+      - /config:uid=1000,gid=1000,mode=0700
+      - /tmp:uid=1000,gid=1000,mode=0700
+    depends_on:
+      pulse:
+        condition: service_healthy
+    restart: unless-stopped
+    mem_limit: 128m

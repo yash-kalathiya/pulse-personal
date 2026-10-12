@@ -6,6 +6,7 @@
 import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { decodeJwt } from "jose";
+import { getConfig } from "../../config";
 import type { Db } from "../../db";
 import { oauthTokens } from "../../db/schema";
 
@@ -43,6 +44,9 @@ export const SCOPES = [
 /** The ID token's verified email names the connected Google account in Settings (and detects a switch). */
 // `profile` adds the photo (`picture`) to the ID token, for the avatar.
 export const LOGIN_SCOPES = ["openid", "email", "profile"];
+
+/** A read-only deployment never asks the user to upgrade an imported grant to write scopes. */
+export const requestedHealthScopes = () => getConfig().googleReadOnly ? SCOPES.filter((s) => s.endsWith(".readonly")) : SCOPES;
 
 /**
  * `code` is ours (`auth_revoked`, `not_connected`, `http_503`, ...) or Google's own error code
@@ -129,7 +133,7 @@ export function authUrl(o: { clientId: string; redirectUri: string; state: strin
     client_id: o.clientId,
     redirect_uri: o.redirectUri,
     response_type: "code",
-    scope: [...LOGIN_SCOPES, ...SCOPES].join(" "),
+    scope: [...LOGIN_SCOPES, ...requestedHealthScopes()].join(" "),
     // offline + consent is what returns a refresh token. Without prompt=consent, a second grant to
     // the same client (localhost, then production) returns an access token only.
     access_type: "offline",
@@ -178,7 +182,7 @@ export async function missingScopes(db: Db, userId: number): Promise<string[]> {
   const [row] = await db.select({ scope: oauthTokens.scope }).from(oauthTokens).where(eq(oauthTokens.userId, userId));
   if (!row) return [];
   const granted = new Set(row.scope.split(/\s+/));
-  return SCOPES.filter((s) => !granted.has(s));
+  return requestedHealthScopes().filter((s) => !granted.has(s));
 }
 
 /**
@@ -246,7 +250,7 @@ export async function exchangeCode(
     accessToken: r.accessToken,
     refreshToken: r.refreshToken,
     expiresAt: t + r.expiresIn,
-    scope: r.scope ?? SCOPES.join(" "),
+    scope: r.scope ?? requestedHealthScopes().join(" "),
     revokedAt: null,
     updatedAt: t,
     ...who,

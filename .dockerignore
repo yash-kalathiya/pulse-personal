@@ -11,6 +11,10 @@ docs/design/reference
 *.tsbuildinfo
 .DS_Store
 .claude
+.lwc
+.local-private
+LOCAL-SETUP.txt
+HOME-WIFI.txt
 docs
 e2e
 playwright.config.ts

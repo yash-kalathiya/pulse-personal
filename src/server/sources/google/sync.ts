@@ -178,14 +178,18 @@ export function createGoogleSource(deps: SyncDeps): Source {
         const [st] = await db.select().from(syncState).where(and(eq(syncState.userId, userId), eq(syncState.type, job.key)));
         const t = nowS();
         const today = localDay(t, tz);
+        const firstAllowed = deps.syncFromDay ?? getConfig().googleSyncFrom;
+        const normalFirst = addDays(today, 1 - BACKFILL_DAYS);
+        const firstDay = firstAllowed && firstAllowed > normalFirst ? firstAllowed : normalFirst;
+        const totalDays = Math.max(0, daysIn({ start: localMidnight(firstDay, tz), end: t }, tz));
         const fresh = st?.syncedThrough == null;
-        const backfilling = fresh || (st.backfillDaysDone ?? 0) < (st.backfillDaysTotal ?? BACKFILL_DAYS);
+        const backfilling = fresh || (st.backfillDaysDone ?? 0) < (st.backfillDaysTotal ?? totalDays);
         let done = fresh ? 0 : (st.backfillDaysDone ?? 0);
 
         let from: number;
         if (fresh) {
-          from = localMidnight(addDays(today, 1 - BACKFILL_DAYS), tz); // today is day 180
-          await setState(db, job.key, { backfillDaysDone: 0, backfillDaysTotal: BACKFILL_DAYS });
+          from = localMidnight(firstDay, tz);
+          await setState(db, job.key, { backfillDaysDone: 0, backfillDaysTotal: totalDays });
         } else if (backfilling) {
           from = st.syncedThrough!; // the last committed chunk's end
         } else {
@@ -200,6 +204,7 @@ export function createGoogleSource(deps: SyncDeps): Source {
           }
         }
 
+        if (firstAllowed) from = Math.max(from, localMidnight(firstAllowed, tz));
         // heart-rate one local day at a time, each page mapped as it arrives: a day can be 86k points (one a second),
         // and holding them raw ran the heap out (a crash loop on a new band's backfill).
         const chunkDays = job.kind === "hr" ? 1 : DATA_TYPES[job.type].maxDays;
@@ -213,11 +218,11 @@ export function createGoogleSource(deps: SyncDeps): Source {
                 : await client.list(job.type, win.start, win.end);
           await db.transaction(async (tx) => {
             if (await (hr !== null ? w.writeHr(tx, hr, win) : w.write(tx, job, points, win))) run.changed = true;
-            if (backfilling) done = Math.min(BACKFILL_DAYS, done + daysIn(win, tz));
+            if (backfilling) done = Math.min(totalDays, done + daysIn(win, tz));
             await setState(tx, job.key, { syncedThrough: win.end, ...(backfilling && { backfillDaysDone: done }) });
           });
         }
-        if (backfilling) await setState(db, job.key, { syncedThrough: t, backfillDaysDone: BACKFILL_DAYS });
+        if (backfilling) await setState(db, job.key, { syncedThrough: t, backfillDaysDone: totalDays });
       }
     },
 

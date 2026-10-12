@@ -36,6 +36,14 @@ const Env = z
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
     GOOGLE_CLIENT_ID: z.string().optional(),
     GOOGLE_CLIENT_SECRET: z.string().optional(),
+    /** Local imported grants: request read scopes only and refuse Google health writes. */
+    GOOGLE_READ_ONLY: z.stringbool().default(false),
+    /** Exclude third-party/unknown provenance from every Google read and archive. */
+    GOOGLE_FITBIT_ONLY: z.stringbool().default(false),
+    /** Earliest local date permitted in Google reads (including future backfills). */
+    GOOGLE_SYNC_FROM: z.iso.date().optional(),
+    /** Explicit consent: unsupported aggregate provenance checks may use device-family + date filtering. */
+    GOOGLE_FITBIT_ROLLUP_FALLBACK: z.stringbool().default(false),
     APP_URL: z.url().optional(),
     /** The Home avatar photo: an absolute URL or a path under public/ ("/me.jpg"). */
     AVATAR_URL: z.string().optional(),
@@ -73,6 +81,8 @@ const Env = z
         need(["BETTER_AUTH_SECRET"], "in production when DATA_SOURCE=google (openssl rand -base64 32)");
       }
     }
+    if (e.GOOGLE_FITBIT_ROLLUP_FALLBACK && (!e.GOOGLE_FITBIT_ONLY || !e.GOOGLE_SYNC_FROM))
+      ctx.addIssue({ code: "custom", path: ["GOOGLE_FITBIT_ROLLUP_FALLBACK"], message: "requires GOOGLE_FITBIT_ONLY and GOOGLE_SYNC_FROM" });
   });
 
 export function parseConfig(env: Record<string, string | undefined>) {
@@ -86,6 +96,10 @@ export function parseConfig(env: Record<string, string | undefined>) {
   const e = r.data;
   return {
     dataSource: e.DATA_SOURCE,
+    googleReadOnly: e.GOOGLE_READ_ONLY,
+    googleFitbitOnly: e.GOOGLE_FITBIT_ONLY,
+    googleSyncFrom: e.GOOGLE_SYNC_FROM ?? null,
+    googleFitbitRollupFallback: e.GOOGLE_FITBIT_ROLLUP_FALLBACK,
     databaseUrl: e.DATABASE_URL ?? "postgres://pulse:pulse@localhost:5432/pulse",
     authSecret: e.BETTER_AUTH_SECRET ?? null,
     appUrl: e.APP_URL?.replace(/\/$/, "") ?? null,

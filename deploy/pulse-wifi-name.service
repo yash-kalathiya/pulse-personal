@@ -1,0 +1,15 @@
+# Install under ~/.config/systemd/user/; adjust the project directory if needed.
+[Unit]
+Description=Pulse current Wi-Fi HTTPS and pulse.local advertisement
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Project/Pulse
+ExecStart=/usr/bin/python3 %h/Project/Pulse/scripts/home_wifi_name.py
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=100
+UMask=0077
+
+[Install]
+WantedBy=default.target

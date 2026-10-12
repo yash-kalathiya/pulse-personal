@@ -4,6 +4,16 @@ import { ConfigError, parseConfig } from "./config";
 const google = { GOOGLE_CLIENT_ID: "id", GOOGLE_CLIENT_SECRET: "secret" };
 
 describe("parseConfig", () => {
+  it("Fitbit-only mode and a valid import boundary are explicit", () => {
+    expect(parseConfig({}).googleFitbitOnly).toBe(false);
+    expect(parseConfig({}).googleSyncFrom).toBeNull();
+    expect(parseConfig({ GOOGLE_FITBIT_ONLY: "true", GOOGLE_SYNC_FROM: "2026-06-28" })).toMatchObject({
+      googleFitbitOnly: true, googleSyncFrom: "2026-06-28",
+    });
+    expect(() => parseConfig({ GOOGLE_SYNC_FROM: "2026-02-30" })).toThrow(/GOOGLE_SYNC_FROM/);
+    expect(() => parseConfig({ GOOGLE_FITBIT_ROLLUP_FALLBACK: "true" })).toThrow(/requires GOOGLE_FITBIT_ONLY/);
+    expect(parseConfig({ GOOGLE_FITBIT_ONLY: "true", GOOGLE_SYNC_FROM: "2026-07-08", GOOGLE_FITBIT_ROLLUP_FALLBACK: "true" }).googleFitbitRollupFallback).toBe(true);
+  });
   it("defaults: demo mode, port 3000, the local dev database, sign-up by invite", () => {
     const c = parseConfig({});
     expect(c.dataSource).toBe("demo");

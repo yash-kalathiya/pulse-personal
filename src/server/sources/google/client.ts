@@ -6,11 +6,13 @@
 import { createHash } from "node:crypto";
 import { gzipSync } from "node:zlib";
 import { and, eq, lt } from "drizzle-orm";
+import { getConfig } from "../../config";
 import type { Db } from "../../db";
 import { rawPayloads } from "../../db/schema";
 import { addDays, localDay, localMidnight, wall } from "../../time";
 import { DATA_TYPES, type DataType, type DataTypeId, type FilterMember } from "./catalogue";
 import { errorCode, FETCH_TIMEOUT_MS, getAccessToken, GoogleError, markRevoked, parseJson } from "./oauth";
+import { FITBIT_DEVICE_FAMILY, isFitbitPoint } from "./sourcePolicy";
 
 const API = "https://health.googleapis.com/v4/users/me/dataTypes";
 const DEVICES_API = "https://health.googleapis.com/v4/users/me/pairedDevices";
@@ -150,6 +152,9 @@ export type ClientDeps = {
   now?: () => number;
   /** Attempts per request for 429, 5xx and network failures. 1: fail fast, no waiting (the live heart-rate pull). */
   maxTries?: number;
+  fitbitOnly?: boolean;
+  syncFromDay?: string | null;
+  allowRestrictedRollupFallback?: boolean;
 };
 
 /** Create one per sync run: the 4 req/s limiter lives in the instance. */
@@ -162,7 +167,11 @@ export function createGoogleClient({
   sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
   now = Date.now,
   maxTries = MAX_TRIES,
+  fitbitOnly = getConfig().googleFitbitOnly,
+  syncFromDay = getConfig().googleSyncFrom,
+  allowRestrictedRollupFallback = getConfig().googleFitbitRollupFallback,
 }: ClientDeps) {
+  const earliest = syncFromDay ? localMidnight(syncFromDay, tz) : -Infinity;
   let nextSlot = 0;
   async function throttle() {
     const t = now();
@@ -252,6 +261,7 @@ export function createGoogleClient({
    * caller that keeps only what it maps holds one page of raw points (5,000) at most.
    */
   async function listEach(type: DataTypeId, from: number, to: number, onPage: (points: unknown[]) => void): Promise<void> {
+    from = Math.max(from, earliest);
     const t: DataType = DATA_TYPES[type];
     if (!t.member) throw new GoogleError("unsupported_action", undefined, `${type} list`);
     for (const w of localWindows(from, to, t.maxDays, tz)) {
@@ -263,12 +273,16 @@ export function createGoogleClient({
       let pages = 0;
       do {
         if (++pages > MAX_PAGES) throw new GoogleError("too_many_pages", undefined, type);
-        const q = new URLSearchParams({ filter, pageSize: String(t.pageSize), ...(pageToken && { pageToken }) });
+        const q = new URLSearchParams({ filter, pageSize: String(t.pageSize), ...(pageToken && { pageToken }),
+          ...(fitbitOnly && type !== "sleep" ? { dataSourceFamily: FITBIT_DEVICE_FAMILY } : {}) });
         const body = await request(`${API}/${type}/dataPoints?${q}`, type);
-        // Before parsing: a changed shape is kept as evidence.
-        if (!UNARCHIVED.has(type)) await archivePage(db, userId, { type, ...range, body, fetchedAt: fetchedAt() });
+        if (!fitbitOnly && !UNARCHIVED.has(type)) await archivePage(db, userId, { type, ...range, body, fetchedAt: fetchedAt() });
         const page = readPage(body, "dataPoints", type);
-        onPage(page.points);
+        const points = fitbitOnly ? page.points.filter(isFitbitPoint) : page.points;
+        // Fitbit-only mode never archives rejected records, including sleep's unfilterable API response.
+        if (fitbitOnly && !UNARCHIVED.has(type)) await archivePage(db, userId, { type, ...range,
+          body: JSON.stringify({ dataPoints: points }), fetchedAt: fetchedAt() });
+        onPage(points);
         pageToken = page.next;
       } while (pageToken);
     }
@@ -295,6 +309,7 @@ export function createGoogleClient({
      * Needs the type's write scope; an older grant answers 403.
      */
     async create(type: string, point: Record<string, unknown>): Promise<string | null> {
+      if (getConfig().googleReadOnly) throw new GoogleError("read_only", 403);
       const where = `${type} create`;
       const op = readOperation(await request(`${API}/${type}/dataPoints`, where, JSON.stringify(point), true), where);
       const name = op.response?.name;
@@ -306,6 +321,7 @@ export function createGoogleClient({
      * parent, so the user id Google put in it is swapped for `me` (the form Google's own delete example uses).
      */
     async batchDelete(type: string, names: string[]): Promise<void> {
+      if (getConfig().googleReadOnly) throw new GoogleError("read_only", 403);
       const where = `${type} batchDelete`;
       const body = JSON.stringify({ names: names.map((n) => n.replace(/^users\/[^/]+\//, "users/me/")) });
       readOperation(await request(`${API}/${type}/dataPoints:batchDelete`, where, body), where);
@@ -331,13 +347,36 @@ export function createGoogleClient({
      * type's `maxDays` (and ROLLUP_MAX_DAYS). One POST per range: rollups do not paginate. Days with no data are omitted.
      */
     async dailyRollUp(type: DataTypeId, fromDay: string, toDay: string): Promise<unknown[]> {
+      if (syncFromDay && fromDay < syncFromDay) fromDay = syncFromDay;
       const t: DataType = DATA_TYPES[type];
       if (!t.dailyRollUp) throw new GoogleError("unsupported_action", undefined, `${type} dailyRollUp`);
       const out: unknown[] = [];
       for (let day = fromDay; day < toDay; ) {
         const step = Math.min(t.maxDays, ROLLUP_MAX_DAYS); // a daily type's list window is longer
         const end = addDays(day, step) < toDay ? addDays(day, step) : toDay;
-        const req = JSON.stringify({ range: { start: civilDate(day), end: civilDate(end) } });
+        if (fitbitOnly) {
+          // Google aggregates have no per-point provenance. Verify every contributing source first.
+          const member = t.member ?? (["blood-glucose", "core-body-temperature"].includes(type)
+            ? "sample_time.physical_time" : "interval.start_time");
+          const filter = buildFilter(type, member, { start: localMidnight(day, tz), end: localMidnight(end, tz) }, tz);
+          let pageToken: string | undefined;
+          let pages = 0;
+          try { do {
+            if (++pages > MAX_PAGES) throw new GoogleError("too_many_pages", undefined, type);
+            const q = new URLSearchParams({ filter, dataSourceFamily: FITBIT_DEVICE_FAMILY,
+              pageSize: "10000", fields: "dataPoints(dataSource),nextPageToken", ...(pageToken && { pageToken }) });
+            const page = readPage(await request(`${API}/${type}/dataPoints?${q}`, `${type} source check`), "dataPoints", type);
+            if (page.points.some((point) => !isFitbitPoint(point))) throw new GoogleError("non_fitbit_rollup_source", undefined, type);
+            pageToken = page.next;
+          } while (pageToken); } catch (err) {
+            // User-authorized fallback is still date-bounded and google-wearables only.
+            // Never relax an explicit non-Fitbit/unknown-source finding or a network/auth failure.
+            if (!(allowRestrictedRollupFallback && syncFromDay && err instanceof GoogleError
+                  && err.code === "UNSUPPORTED_DATA_TYPE_ACTION")) throw err;
+          }
+        }
+        const req = JSON.stringify({ range: { start: civilDate(day), end: civilDate(end) },
+          ...(fitbitOnly && { dataSourceFamily: FITBIT_DEVICE_FAMILY }) });
         const body = await request(`${API}/${type}/dataPoints:dailyRollUp`, `${type} dailyRollUp`, req);
         await archivePage(db, userId, {
           type,

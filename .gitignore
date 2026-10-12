@@ -49,8 +49,24 @@ npm-debug.log*
 /site/node_modules/
 /site/dist/
 /site/.astro/
+/site/.pnpm-store/
 /backups/
 /build-scripts/
 
 # This machine's compose additions (scripts/deploy.sh loads it when present)
 compose.override.yaml
+/.local-private/
+/scripts/__pycache__/
+# Machine-specific audit/setup notes can contain network or personal-history details.
+/LOCAL-SETUP.txt
+/HOME-WIFI.txt
+/.lwc/
+*.dump
+*.sqlite
+*.sqlite3
+*.db
+*.key
+*.p12
+*.pfx
+*.mobileconfig
+/scripts/__screens__/

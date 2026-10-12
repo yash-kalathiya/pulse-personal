@@ -12,7 +12,7 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm build
 # Scripts run outside the Next server, so each gets its own bundle with its dependencies inside.
-RUN for s in reset-password.mjs:reset-password seed-demo-user.mts:seed-user; do \
+RUN for s in reset-password.mjs:reset-password seed-demo-user.mts:seed-user reset-imported-health.mts:reset-imported-health check-fitbit-source.mts:check-fitbit-source; do \
   pnpm exec esbuild "scripts/${s%%:*}" --bundle --platform=node --format=esm --target=node24 --external:pg-native \
     --banner:js="import{createRequire}from'module';const require=createRequire(import.meta.url);" --outfile="build-scripts/${s##*:}.mjs"; done
 
