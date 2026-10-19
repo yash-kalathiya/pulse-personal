@@ -21,7 +21,7 @@ export function Consent() {
     <div className="space-y-4">
       <h2 className="text-[22px] leading-7 font-bold text-balance">Before you start</h2>
       <ul className="list-disc space-y-2 pl-5 text-[15px] leading-[22px] text-foreground-secondary marker:text-muted-foreground">
-        <li>To answer, the coach sends your questions and the Pulse numbers it looks up (scores, vitals, workouts, journal behaviours) to the AI provider you choose next, with your own key. Your name and email are never sent.</li>
+        <li>To answer, the coach sends your questions and the Pulse numbers it looks up (scores, vitals, workouts, journal behaviours) to the AI provider you choose next, with your own key. While the coach is on, opening a workout also sends that workout’s displayed facts for its one-line coach glance. Your name and email are never sent.</li>
         <li>Your provider’s terms and pricing apply. Pulse adds no cost.</li>
         <li>Chats are saved on this server, visible only to you. Delete them any time.</li>
         <li>Answers can be wrong, and they are not medical advice.</li>
@@ -109,7 +109,35 @@ export function ProviderForm({ providers, current, onSaved }: { providers: Provi
           }
         />
       )}
-      <AuthField label="Model" name="model" value={model} onChange={(e) => setModel(e.currentTarget.value)} required maxLength={120} autoCapitalize="none" spellCheck={false} hint={p.needsKey ? "Any model your provider offers." : "Set by whoever runs this server."} readOnly={!p.needsKey} />
+      <AuthField
+        label="Model"
+        name="model"
+        value={model}
+        onChange={(e) => setModel(e.currentTarget.value)}
+        required
+        maxLength={120}
+        autoCapitalize="none"
+        spellCheck={false}
+        hint={p.fixedModel ? "Fixed for this provider." : p.needsKey ? "Any model your provider offers." : "Set by whoever runs this server."}
+        readOnly={p.fixedModel || !p.needsKey}
+      />
+      {p.info && (
+        <div className="space-y-2 rounded-xl bg-foreground/[0.04] p-3 text-[13px] leading-[18px] text-foreground-secondary ring-1 ring-border">
+          <p>{p.info.privacy}</p>
+          <p>{p.info.limits}</p>
+          <p className="flex flex-wrap gap-x-3 gap-y-1">
+            <a href={p.info.privacyUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 font-semibold text-coach-text underline-offset-4 hover:underline">
+              Data policy <ArrowUpRight aria-hidden className="size-3.5" />
+            </a>
+            <a href={p.info.dataControlsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 font-semibold text-coach-text underline-offset-4 hover:underline">
+              Enable Zero Data Retention <ArrowUpRight aria-hidden className="size-3.5" />
+            </a>
+            <a href={p.info.limitsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 font-semibold text-coach-text underline-offset-4 hover:underline">
+              Your limits <ArrowUpRight aria-hidden className="size-3.5" />
+            </a>
+          </p>
+        </div>
+      )}
       {error && (
         <p role="alert" className="px-1 text-[13px] leading-[18px] font-medium text-recovery-red-text">
           {error}

@@ -77,7 +77,8 @@ flowchart LR
   R -- "chat saved" --> DB[("coach_chats")]
 ```
 
-- **Providers:** Anthropic, OpenAI, Google Gemini, Vercel AI Gateway or OpenRouter. Pulse makes one tiny test
+- **Providers:** Anthropic, OpenAI, Google Gemini, Groq, Vercel AI Gateway or OpenRouter. Groq uses the fixed
+  `https://api.groq.com/openai/v1` endpoint and pins `qwen/qwen3.8-27b`. Pulse makes one tiny test
   request and saves a key only if it works.
 - **What leaves the server:** the person's questions and the numbers the tools look up (scores, vitals, workouts,
   journal behaviours), sent to the provider *they* chose. Never names, emails or Google tokens.

@@ -188,6 +188,15 @@ test("coach: an admin turns it on, the P button opens it, set-up, a question wit
   await expect(page.getByRole("heading", { name: "Connect your AI provider" })).toBeVisible();
   await expect(page.getByRole("radio", { name: "Anthropic" })).toBeVisible();
   await shot(page, "10-coach-provider");
+  await page.getByRole("radio", { name: "Groq" }).click();
+  await expect(page.getByRole("textbox", { name: "Model" })).toHaveValue("qwen/qwen3.8-27b");
+  await expect(page.getByRole("textbox", { name: "Model" })).toHaveAttribute("readonly");
+  await expect(page.getByRole("link", { name: /Enable Zero Data Retention/ })).toHaveAttribute(
+    "href",
+    "https://console.groq.com/settings/data-controls",
+  );
+  await expect(page.getByRole("link", { name: /Your limits/ })).toHaveAttribute("href", "https://console.groq.com/settings/limits");
+  await shot(page, "10b-coach-groq-provider");
   await page.getByRole("radio", { name: "Test model" }).click();
   await page.getByRole("button", { name: "Test and save" }).click();
 

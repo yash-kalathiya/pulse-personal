@@ -19,6 +19,37 @@ Keep the original `LICENSE` and `NOTICE`; this remains a noncommercial project.
   IPv4 subnet; password login and the existing account remain in use.
 - Wake-up-time previews on Home and Sleep, without changing recorded sleep or
   creating an alarm. Previews are temporary and respect the profile time zone.
+- Groq as a Coach provider, sent only to Groq's fixed OpenAI-compatible endpoint
+  and pinned to `qwen/qwen3.8-27b`. The user's key follows the existing encrypted
+  BYOK path and is never committed to this repository.
+
+## Groq limits and privacy
+
+Checked against Groq's official [model](https://console.groq.com/docs/model/qwen/qwen3.8-27b)
+and [rate-limit](https://console.groq.com/docs/rate-limits) documentation on
+2026-10-18. The published Free Plan limits for `qwen/qwen3.8-27b` are 30 requests
+per minute, 1,000 requests per day, 8,000 tokens per minute and 200,000 tokens per
+day. Groq does not publish a separate per-second quota; the minute limits average
+to about 0.5 requests and 133 tokens per second, but that arithmetic is not a
+burst guarantee. Its Developer Plan table lists 1,000 requests per minute and
+250,000 tokens per minute without a daily limit in that table. The exact
+[organization and project limits](https://console.groq.com/settings/limits) in
+the Groq Console are authoritative.
+
+Groq's [data documentation](https://console.groq.com/docs/your-data) says
+inference inputs and outputs are not retained by default, but it may temporarily
+log them for reliability or abuse investigations for up to 30 days. Usage
+metadata is always retained and excludes inputs and outputs. All customers may
+enable [Zero Data Retention](https://console.groq.com/settings/data-controls);
+retained customer data is stored in US GCP buckets. Groq's
+[Services Agreement](https://console.groq.com/docs/legal/services-agreement)
+says inputs and outputs are not used for model training unless the customer
+explicitly permits it.
+
+The Qwen model is marked Preview. Groq's agreement says preview/beta services
+may fall outside its DPA and BAA unless documentation says otherwise. Treat the
+coach as a wellness assistant, not medical advice, and enable Zero Data Retention
+before asking it about personal health data.
 
 ## Private configuration
 

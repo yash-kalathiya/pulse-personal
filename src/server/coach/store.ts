@@ -9,7 +9,7 @@ import { coachChats, coachSettings, serverSettings, user } from "../db/schema";
 import { decryptKey, encryptKey } from "./crypto";
 import { mockModel } from "./mock";
 import { daysBetween, localDay } from "../time";
-import { localModel, providerOf } from "./providers";
+import { localModel, providerModel, providerOf } from "./providers";
 
 const now = () => Math.floor(Date.now() / 1000);
 
@@ -98,7 +98,7 @@ export function modelFor(provider: string, model: string, apiKey: string | null)
   if (provider === "local") return cfg.coachLocal ? localModel(cfg.coachLocal.url, cfg.coachLocal.model) : null;
   if (provider === "mock") return cfg.coachMock ? mockModel() : null;
   const p = providerOf(provider);
-  return p && apiKey ? p.create(apiKey, model) : null;
+  return p && apiKey ? p.create(apiKey, providerModel(provider, model)) : null;
 }
 
 export async function coachModel(db: Db, userId: number): Promise<{ model: LanguageModel; provider: string; instructions: string | null } | { problem: ModelProblem }> {

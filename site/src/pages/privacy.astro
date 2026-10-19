@@ -24,14 +24,15 @@ const toc = [
 
 <Legal
   title="Privacy Policy"
-  description="What the hosted Pulse app collects, how it uses your Google Health data, who it is shared with (no one), and how to export or delete it."
+  description="What the hosted Pulse app collects, how it uses and shares your Google Health data, and how to export or delete it."
   keywords={["pulse privacy policy", "google health data privacy", "pulse data deletion"]}
-  effective="2026-10-06"
+  effective="2026-10-18"
   toc={toc}
 >
   <p class="lede" slot="lede">
     Pulse turns your own Google Health data into recovery, strain and sleep scores. This page explains what the hosted Pulse app collects, why, and how you stay in control of
-    it. Short version: your data is used only to show you your scores. It is never sold, never used for ads, and never shared.
+    it. Short version: your data is used only to provide Pulse's features. It is never sold or used for ads, and is shared only in the limited cases described below, including
+    with the AI provider you choose if you turn on the coach.
   </p>
 
   <section id="who">
@@ -110,7 +111,7 @@ const toc = [
       <li>computing your recovery, strain, sleep and stress scores, baselines, trends and reports;</li>
       <li>showing your health data, journal and logged entries back to you;</li>
       <li>saving what you log to your Google Health account;</li>
-      <li>answering your questions in the AI coach, if you turn it on (see Sharing);</li>
+      <li>answering your questions and generating one-line workout glances in the AI coach, if you turn it on (see Sharing);</li>
       <li>keeping your account secure and the service running.</li>
     </ul>
     <p>Specifically, Pulse does <strong>not</strong>:</p>
@@ -151,11 +152,18 @@ const toc = [
     <h3>AI coach</h3>
     <p>
       The coach is optional and off unless you turn it on. To use it, you agree to its consent notice and add an API key for an AI provider you pick (Anthropic, OpenAI,
-      Google Gemini, Vercel AI Gateway or OpenRouter), or choose a model the maintainer runs on the same server. When you ask the coach a question, Pulse sends that provider
+      Google Gemini, Groq, Vercel AI Gateway or OpenRouter), or choose a model the maintainer runs on the same server. When you ask the coach a question, Pulse sends that provider
       your question, your earlier messages in the chat, and the parts of your data needed to answer it, such as your recovery, sleep, heart rate variability, activities and
-      journal. The provider processes it under your own account and its terms; Pulse never uses it to train models. Nothing is sent until you ask a question, and nothing is
-      sent if you turn the coach off or remove your key. Your API key is stored encrypted and never sent to your browser. Your chats are kept until you delete them or your
-      account.
+      journal. While the coach is on, opening an activity also sends that activity's displayed facts to generate its one-line coach glance. A morning-brief notification is
+      generated locally; its provider request starts only if you tap it. The provider processes data under your own account and its terms; Pulse never uses it to train models.
+      Saving a provider sends one tiny key-test prompt with no personal or health data. Nothing is sent after you turn the coach off or remove your key. Your API key is stored
+      encrypted and is never returned to your browser after saving. Your chats are kept until you delete them or your account.
+    </p>
+    <p>
+      For Groq, its <a href="https://console.groq.com/docs/your-data">data documentation</a> says prompts and replies may be temporarily logged for reliability or abuse review
+      for up to 30 days. Groq lets customers enable <a href="https://console.groq.com/settings/data-controls">Zero Data Retention</a>; enable it before using the coach with
+      health data. Groq still keeps usage metadata, which it says excludes inputs and outputs. Groq's
+      <a href="https://console.groq.com/docs/legal/services-agreement">services agreement</a>, rather than its general website privacy policy, governs API customer data.
     </p>
     <p>We may disclose data if the law requires it, for example a valid court order. We would tell you if we are allowed to.</p>
   </section>

@@ -534,7 +534,7 @@ and `console` finds none. The one outward import is a type, `ReasonCode` from `@
   emails; `store.ts:31-38`), consent and model (`:97-110`), in-memory rate limit, body validation, build `QueryCtx`, read admin-edited wording, run
   `streamText` with read-only tools closed over the user's context (`tools.ts:123-223`; each tool calls the same query functions as the
   screens), save the chat on end (`:90-93`). User API keys are AES-256-GCM, key from HKDF of `BETTER_AUTH_SECRET` (`crypto.ts:6-22`).
-  Providers: Anthropic, OpenAI, Google, Vercel Gateway, OpenRouter, plus an owner-configured local model (`providers.ts:22-63`). The server never
+  Providers: Anthropic, OpenAI, Google, Groq, Vercel Gateway, OpenRouter, plus an owner-configured local model (`providers.ts`). The server never
   accepts a user-supplied URL (`providers.ts:1-3`).
 - **Reports** are computed in stage 2 and stored in `reports` (ISO weeks `YYYY-Www` and months `YYYY-MM`) for every period that has data
   (`stage2.ts:149-170`, `core/algorithms/reports.ts:83-86`). Pages only read them (`queries/reports.ts`).

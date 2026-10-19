@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { currentUser, SIGNED_OUT } from "../auth";
 import { MAX_NOTES } from "../coach/instructions";
-import { providerOf } from "../coach/providers";
+import { providerModel, providerOf } from "../coach/providers";
 import { coachAccess, deleteAllChats, deleteChat, groupChats, listChats, modelFor, removeProvider, saveProvider, setConsent, setPreferences, type ChatCursor, type ChatGroup } from "../coach/store";
 import { ctxOf } from "../queries/common";
 import { getConfig } from "../config";
@@ -51,7 +51,7 @@ export async function saveProviderAction(input: z.input<typeof Provider>): Promi
   const apiKey = keyless ? null : r.data.apiKey;
   if (!keyless && !apiKey) return { ok: false, error: "Paste your API key." };
   if (apiKey && !cfg.authSecret) return { ok: false, error: "This server has no BETTER_AUTH_SECRET, so it can’t store keys safely. Ask whoever runs it." };
-  const usedModel = provider === "local" ? cfg.coachLocal!.model : model;
+  const usedModel = provider === "local" ? cfg.coachLocal!.model : providerModel(provider, model);
   const m = modelFor(provider, usedModel, apiKey);
   if (!m) return { ok: false, error: "Pick a provider." };
   try {
